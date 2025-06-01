@@ -422,7 +422,7 @@ class MinesweeperApp:
         tk.Label(self.root, text="Select Mode", font=("Arial", 22, "bold"), bg=bg).pack(pady=25)
 
         modes = [
-            ("Easy", 8, 8, 4, "standard"),
+            ("Easy", 8, 8, 10, "standard"),
             ("Medium", 12, 12, 20, "standard"),
             ("Hard", 16, 16, 40, "standard"),
             ("Extreme", 20, 20, 60, "standard"),
