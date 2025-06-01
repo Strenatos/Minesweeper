@@ -73,7 +73,7 @@ class MinesweeperApp:
             },
             "high_number": {
                 "name": "Lucky Number",
-                "description": "Find a 6 or higher number tile",
+                "description": "Find a 5 or higher number tile",
                 "icon": "🎯"
             },
             "speed_demon": {
@@ -81,6 +81,7 @@ class MinesweeperApp:
                 "description": "Win Easy mode in under 30 seconds",
                 "icon": "⚡"
             },
+
             "perfectionist": {
                 "name": "Perfectionist",
                 "description": "Win without any wrong flags",
@@ -100,11 +101,6 @@ class MinesweeperApp:
                 "name": "Explorer",
                 "description": "Find the secret fish",
                 "icon": "🐟"
-            },
-            "streak_master": {
-                "name": "Streak Master",
-                "description": "Win 5 games in a row",
-                "icon": "🔥"
             },
             "bomb_defuser": {
                 "name": "Bomb Defuser",
@@ -200,7 +196,7 @@ class MinesweeperApp:
                     self.unlock_achievement("daily_warrior")
         
         # High number achievement
-        if game_result["max_number"] >= 6 and "high_number" not in self.user_achievements:
+        if game_result["max_number"] >= 5 and "high_number" not in self.user_achievements:
             self.unlock_achievement("high_number")
 
     def add_score(self, mode, time, name):
@@ -426,11 +422,11 @@ class MinesweeperApp:
         tk.Label(self.root, text="Select Mode", font=("Arial", 22, "bold"), bg=bg).pack(pady=25)
 
         modes = [
-            ("Easy", 8, 8, 10, "standard"),
+            ("Easy", 8, 8, 4, "standard"),
             ("Medium", 12, 12, 20, "standard"),
             ("Hard", 16, 16, 40, "standard"),
-            ("Extreme", 24, 24, 99, "standard"),
-            ("Nathan", 25, 25, 200, "nathan"),
+            ("Extreme", 20, 20, 60, "standard"),
+            ("Nathan", 25, 25, 99, "nathan"),
         ]
 
         for name, rows, cols, mines, mode in modes:
@@ -565,7 +561,7 @@ class Minesweeper:
         if self.first_click:
             self.first_click = False
             if self.mode == "nathan":
-                safe_zone = self.get_chunk(r, c, size=2)
+                safe_zone = self.get_chunk(r, c, size=15)
                 self.place_mines_random_except_safe(safe_zone)
             else:
                 size = 2 if self.rows <= 8 else 3 if self.rows <= 16 else 4
