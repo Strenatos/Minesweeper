@@ -104,7 +104,7 @@ class MinesweeperApp:
             },
             "bomb_defuser": {
                 "name": "Bomb Defuser",
-                "description": "Win Hard mode in under 60 seconds",
+                "description": "Win Hard mode in under 100 seconds",
                 "icon": "💣"
             },
             "collector": {
@@ -172,7 +172,7 @@ class MinesweeperApp:
                 "speed_demon" not in self.user_achievements):
                 self.unlock_achievement("speed_demon")
             
-            if (game_result["mode"] == "Hard" and game_result["time"] < 60 and 
+            if (game_result["mode"] == "Hard" and game_result["time"] < 100 and 
                 "bomb_defuser" not in self.user_achievements):
                 self.unlock_achievement("bomb_defuser")
             
