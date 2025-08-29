@@ -1,0 +1,771 @@
+import tkinter as tk
+from tkinter import messagebox, simpledialog
+import random
+import json
+import os
+import datetime
+import hashlib
+
+class MinesweeperApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Minesweeper")
+        self.leaderboard_file = "minesweeper_scores.json"
+        self.achievements_file = "minesweeper_achievements.json"
+        self.daily_file = "daily_challenges.json"
+        self.load_leaderboard()
+        self.load_achievements()
+        self.load_daily_progress()
+        self.init_achievements()
+        self.start_menu()
+
+    def load_leaderboard(self):
+        """Load leaderboard from file or create empty one"""
+        try:
+            if os.path.exists(self.leaderboard_file):
+                with open(self.leaderboard_file, 'r') as f:
+                    self.leaderboard = json.load(f)
+            else:
+                self.leaderboard = {}
+        except:
+            self.leaderboard = {}
+        
+        # Ensure all difficulty modes have empty lists
+        modes = ["Easy", "Medium", "Hard", "Extreme", "Nathan", "Daily"]
+        for mode in modes:
+            if mode not in self.leaderboard:
+                self.leaderboard[mode] = []
+
+    def load_achievements(self):
+        """Load achievements from file or create empty one"""
+        try:
+            if os.path.exists(self.achievements_file):
+                with open(self.achievements_file, 'r') as f:
+                    self.user_achievements = json.load(f)
+            else:
+                self.user_achievements = {}
+        except:
+            self.user_achievements = {}
+
+    def load_daily_progress(self):
+        """Load daily challenge progress"""
+        try:
+            if os.path.exists(self.daily_file):
+                with open(self.daily_file, 'r') as f:
+                    self.daily_progress = json.load(f)
+            else:
+                self.daily_progress = {}
+        except:
+            self.daily_progress = {}
+
+    def init_achievements(self):
+        """Initialize achievement definitions"""
+        self.achievements = {
+            "first_win": {
+                "name": "First Victory",
+                "description": "Win your first game",
+                "icon": "🏆"
+            },
+            "nathan_master": {
+                "name": "Nathan's Nightmare",
+                "description": "Beat Nathan mode",
+                "icon": "💀"
+            },
+            "high_number": {
+                "name": "Lucky Number",
+                "description": "Find a 5 or higher number tile",
+                "icon": "🎯"
+            },
+            "speed_demon": {
+                "name": "Speed Demon",
+                "description": "Win Easy mode in under 30 seconds",
+                "icon": "⚡"
+            },
+
+            "perfectionist": {
+                "name": "Perfectionist",
+                "description": "Win without any wrong flags",
+                "icon": "✨"
+            },
+            "flag_master": {
+                "name": "Flag Master",
+                "description": "Win a game without using flags",
+                "icon": "🚩"
+            },
+            "daily_warrior": {
+                "name": "Daily Warrior",
+                "description": "Complete 7 daily challenges",
+                "icon": "📅"
+            },
+            "explorer": {
+                "name": "Explorer",
+                "description": "Find the secret fish",
+                "icon": "🐟"
+            },
+            "bomb_defuser": {
+                "name": "Bomb Defuser",
+                "description": "Win Hard mode in under 60 seconds",
+                "icon": "💣"
+            },
+            "collector": {
+                "name": "Achievement Collector",
+                "description": "Unlock 5 other achievements",
+                "icon": "🎖️"
+            }
+        }
+
+    def save_leaderboard(self):
+        """Save leaderboard to file"""
+        try:
+            with open(self.leaderboard_file, 'w') as f:
+                json.dump(self.leaderboard, f, indent=2)
+        except:
+            pass
+
+    def save_achievements(self):
+        """Save achievements to file"""
+        try:
+            with open(self.achievements_file, 'w') as f:
+                json.dump(self.user_achievements, f, indent=2)
+        except:
+            pass
+
+    def save_daily_progress(self):
+        """Save daily progress to file"""
+        try:
+            with open(self.daily_file, 'w') as f:
+                json.dump(self.daily_progress, f, indent=2)
+        except:
+            pass
+
+    def unlock_achievement(self, achievement_id):
+        """Unlock an achievement"""
+        if achievement_id not in self.user_achievements:
+            self.user_achievements[achievement_id] = {
+                "unlocked": True,
+                "date": datetime.datetime.now().isoformat()
+            }
+            self.save_achievements()
+            
+            # Show achievement notification
+            achievement = self.achievements[achievement_id]
+            messagebox.showinfo("Achievement Unlocked!", 
+                               f"{achievement['icon']} {achievement['name']}\n{achievement['description']}")
+            
+            # Check for collector achievement
+            if len(self.user_achievements) >= 5 and "collector" not in self.user_achievements:
+                self.unlock_achievement("collector")
+
+    def check_achievements(self, game_result):
+        """Check and unlock achievements based on game result"""
+        if game_result["won"]:
+            # First win
+            if "first_win" not in self.user_achievements:
+                self.unlock_achievement("first_win")
+            
+            # Nathan mode
+            if game_result["mode"] == "Nathan" and "nathan_master" not in self.user_achievements:
+                self.unlock_achievement("nathan_master")
+            
+            # Speed achievements
+            if (game_result["mode"] == "Easy" and game_result["time"] < 30 and 
+                "speed_demon" not in self.user_achievements):
+                self.unlock_achievement("speed_demon")
+            
+            if (game_result["mode"] == "Hard" and game_result["time"] < 60 and 
+                "bomb_defuser" not in self.user_achievements):
+                self.unlock_achievement("bomb_defuser")
+            
+            # Perfectionist (no wrong flags)
+            if game_result["perfect_flags"] and "perfectionist" not in self.user_achievements:
+                self.unlock_achievement("perfectionist")
+            
+            # Flag master (no flags used)
+            if game_result["no_flag_only"] and "flag_master" not in self.user_achievements:
+                self.unlock_achievement("flag_master")
+            
+            # Daily challenges
+            if game_result["mode"] == "Daily":
+                today = datetime.date.today().isoformat()
+                if today not in self.daily_progress:
+                    self.daily_progress[today] = True
+                    self.save_daily_progress()
+                
+                completed_days = len(self.daily_progress)
+                if completed_days >= 7 and "daily_warrior" not in self.user_achievements:
+                    self.unlock_achievement("daily_warrior")
+        
+        # High number achievement
+        if game_result["max_number"] >= 5 and "high_number" not in self.user_achievements:
+            self.unlock_achievement("high_number")
+
+    def add_score(self, mode, time, name):
+        """Add a new score to the leaderboard"""
+        score_entry = {"name": name, "time": time}
+        self.leaderboard[mode].append(score_entry)
+        # Sort by time (ascending) and keep top 10
+        self.leaderboard[mode].sort(key=lambda x: x["time"])
+        self.leaderboard[mode] = self.leaderboard[mode][:10]
+        self.save_leaderboard()
+
+    def is_high_score(self, mode, time):
+        """Check if time qualifies for leaderboard"""
+        scores = self.leaderboard[mode]
+        return len(scores) < 10 or time < scores[-1]["time"]
+
+    def get_daily_challenge(self):
+        """Generate deterministic daily challenge based on date"""
+        today = datetime.date.today()
+        seed = int(hashlib.md5(today.isoformat().encode()).hexdigest()[:8], 16)
+        random.seed(seed)
+        
+        # Generate unique shaped grids
+        shapes = [
+            "cross", "diamond", "heart", "star", "hexagon", "triangle", "circle"
+        ]
+        shape = random.choice(shapes)
+        
+        # Reset random seed for game generation
+        random.seed()
+        
+        return {
+            "shape": shape,
+            "date": today.isoformat(),
+            "completed": today.isoformat() in self.daily_progress
+        }
+
+    def start_menu(self):
+        self.clear_window()
+        bg = "#d0f0c0"
+        self.root.configure(bg=bg)
+        tk.Label(self.root, text="Minesweeper", font=("Arial", 28, "bold"), bg=bg).pack(pady=30)
+        
+        button_frame = tk.Frame(self.root, bg=bg)
+        button_frame.pack(pady=10)
+        
+        tk.Button(button_frame, text="Play", font=("Arial", 16), command=self.difficulty_menu, bg="white").pack(pady=5)
+        tk.Button(button_frame, text="Daily Challenge", font=("Arial", 16), command=self.daily_challenge_menu, bg="gold").pack(pady=5)
+        tk.Button(button_frame, text="Achievements", font=("Arial", 16), command=self.show_achievements, bg="lightblue").pack(pady=5)
+        tk.Button(button_frame, text="Leaderboard", font=("Arial", 16), command=self.show_leaderboard, bg="white").pack(pady=5)
+        
+        # Secret fish in bottom left
+        fish_btn = tk.Button(self.root, text="🐟", font=("Arial", 12), 
+                            command=self.secret_fish, bg=bg, relief=tk.FLAT, bd=0)
+        fish_btn.place(x=10, y=self.root.winfo_height()-30)
+
+    def secret_fish(self):
+        """Secret fish easter egg"""
+        if "explorer" not in self.user_achievements:
+            self.unlock_achievement("explorer")
+        else:
+            messagebox.showinfo("Secret Fish", "🐟 You already found me! 🐟")
+
+    def daily_challenge_menu(self):
+        self.clear_window()
+        bg = "#fff9c4"
+        self.root.configure(bg=bg)
+        
+        challenge = self.get_daily_challenge()
+        
+        tk.Label(self.root, text="Daily Challenge", font=("Arial", 22, "bold"), bg=bg).pack(pady=20)
+        tk.Label(self.root, text=f"Today's Shape: {challenge['shape'].title()}", font=("Arial", 16), bg=bg).pack(pady=10)
+        
+        if challenge["completed"]:
+            tk.Label(self.root, text="✅ Completed Today!", font=("Arial", 14), fg="green", bg=bg).pack(pady=5)
+        
+        tk.Button(self.root, text="Play Daily Challenge", font=("Arial", 14),
+                  command=lambda: self.start_daily_challenge(challenge), bg="gold").pack(pady=20)
+        
+        tk.Button(self.root, text="Back", font=("Arial", 12), command=self.start_menu, bg="lightgray").pack(pady=10)
+
+    def start_daily_challenge(self, challenge):
+        """Start the daily challenge with unique shape"""
+        rows, cols, mines = self.generate_shaped_grid(challenge["shape"])
+        self.clear_window()
+        self.game = Minesweeper(self.root, rows, cols, mines, back_to_menu=self.start_menu, 
+                               mode="daily", difficulty_name="Daily", app=self, 
+                               shape=challenge["shape"], grid_shape=self.get_shape_cells(challenge["shape"], rows, cols))
+        self.root.bind("<r>", lambda e: self.game.reset_board())
+        self.root.bind("<R>", lambda e: self.game.reset_board())
+
+    def generate_shaped_grid(self, shape):
+        """Generate grid dimensions and mine count for shaped challenges"""
+        configs = {
+            "cross": (15, 15, 25),
+            "diamond": (13, 13, 20),
+            "heart": (12, 14, 18),
+            "star": (15, 15, 22),
+            "hexagon": (12, 14, 20),
+            "triangle": (15, 15, 18),
+            "circle": (13, 13, 16)
+        }
+        return configs.get(shape, (10, 10, 15))
+
+    def get_shape_cells(self, shape, rows, cols):
+        """Get valid cells for the shape"""
+        center_r, center_c = rows // 2, cols // 2
+        valid_cells = set()
+        
+        if shape == "cross":
+            for r in range(rows):
+                for c in range(cols):
+                    if r == center_r or c == center_c or abs(r - center_r) == abs(c - center_c):
+                        valid_cells.add((r, c))
+        
+        elif shape == "diamond":
+            for r in range(rows):
+                for c in range(cols):
+                    if abs(r - center_r) + abs(c - center_c) <= min(center_r, center_c):
+                        valid_cells.add((r, c))
+        
+        elif shape == "heart":
+            for r in range(rows):
+                for c in range(cols):
+                    x, y = c - center_c, center_r - r
+                    # Heart equation approximation
+                    if ((x**2 + y**2 - 1)**3 - x**2 * y**3 <= 0 and 
+                        abs(x) <= 4 and abs(y) <= 3):
+                        valid_cells.add((r, c))
+        
+        elif shape == "circle":
+            radius = min(center_r, center_c) - 1
+            for r in range(rows):
+                for c in range(cols):
+                    if (r - center_r)**2 + (c - center_c)**2 <= radius**2:
+                        valid_cells.add((r, c))
+        
+        elif shape == "star":
+            for r in range(rows):
+                for c in range(cols):
+                    x, y = c - center_c, r - center_r
+                    # Star pattern
+                    if (abs(x) <= 1 or abs(y) <= 1 or 
+                        abs(x - y) <= 1 or abs(x + y) <= 1):
+                        valid_cells.add((r, c))
+        
+        elif shape == "hexagon":
+            for r in range(rows):
+                for c in range(cols):
+                    x, y = c - center_c, r - center_r
+                    if abs(x) + abs(y) + abs(x + y) <= 8:
+                        valid_cells.add((r, c))
+        
+        elif shape == "triangle":
+            for r in range(rows):
+                for c in range(cols):
+                    if r >= center_r - 2 and abs(c - center_c) <= r - center_r + 5:
+                        valid_cells.add((r, c))
+        
+        return valid_cells if valid_cells else {(r, c) for r in range(rows) for c in range(cols)}
+
+    def show_achievements(self):
+        self.clear_window()
+        bg = "#e6f3ff"
+        self.root.configure(bg=bg)
+        
+        tk.Label(self.root, text="🏆 Achievements 🏆", font=("Arial", 24, "bold"), bg=bg).pack(pady=20)
+        
+        # Create scrollable frame
+        canvas = tk.Canvas(self.root, bg=bg, highlightthickness=0, height=400)
+        scrollbar = tk.Scrollbar(self.root, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg=bg)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        unlocked_count = len(self.user_achievements)
+        total_count = len(self.achievements)
+        
+        tk.Label(scrollable_frame, text=f"Progress: {unlocked_count}/{total_count}", 
+                font=("Arial", 14), bg=bg).pack(pady=10)
+        
+        for achievement_id, achievement in self.achievements.items():
+            frame = tk.Frame(scrollable_frame, bg="white", relief=tk.RAISED, bd=2)
+            frame.pack(fill=tk.X, padx=20, pady=5)
+            
+            unlocked = achievement_id in self.user_achievements
+            
+            # Achievement icon and name
+            header_frame = tk.Frame(frame, bg="white")
+            header_frame.pack(fill=tk.X, padx=10, pady=5)
+            
+            icon_color = "black" if unlocked else "gray"
+            tk.Label(header_frame, text=achievement["icon"], font=("Arial", 16), 
+                    bg="white", fg=icon_color).pack(side=tk.LEFT)
+            
+            name_color = "black" if unlocked else "gray"
+            tk.Label(header_frame, text=achievement["name"], font=("Arial", 12, "bold"), 
+                    bg="white", fg=name_color).pack(side=tk.LEFT, padx=10)
+            
+            if unlocked:
+                tk.Label(header_frame, text="✅", font=("Arial", 14), bg="white").pack(side=tk.RIGHT)
+            
+            # Description
+            desc_color = "black" if unlocked else "gray"
+            tk.Label(frame, text=achievement["description"], font=("Arial", 10), 
+                    bg="white", fg=desc_color).pack(padx=10, pady=(0, 5))
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        tk.Button(self.root, text="Back", font=("Arial", 14), command=self.start_menu, bg="lightgray").pack(pady=10)
+
+    def difficulty_menu(self):
+        self.clear_window()
+        bg = "#cce0ff"
+        self.root.configure(bg=bg)
+        tk.Label(self.root, text="Select Mode", font=("Arial", 22, "bold"), bg=bg).pack(pady=25)
+
+        modes = [
+            ("Easy", 8, 8, 8, "standard"),
+            ("Medium", 12, 12, 20, "standard"),
+            ("Hard", 16, 16, 40, "standard"),
+            ("Extreme", 20, 20, 60, "standard"),
+            ("Nathan", 25, 25, 99, "nathan"),
+        ]
+
+        for name, rows, cols, mines, mode in modes:
+            tk.Button(self.root, text=name, font=("Arial", 14),
+                      command=lambda r=rows, c=cols, m=mines, mo=mode, n=name: self.start_game(r, c, m, mo, n),
+                      bg="white", width=18).pack(pady=5)
+        
+        tk.Button(self.root, text="Back", font=("Arial", 12), command=self.start_menu, bg="lightgray").pack(pady=10)
+
+    def show_leaderboard(self):
+        self.clear_window()
+        bg = "#ffe6cc"
+        self.root.configure(bg=bg)
+        
+        tk.Label(self.root, text="🏆 Leaderboard 🏆", font=("Arial", 24, "bold"), bg=bg).pack(pady=20)
+        
+        # Create scrollable frame
+        canvas = tk.Canvas(self.root, bg=bg, highlightthickness=0)
+        scrollbar = tk.Scrollbar(self.root, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg=bg)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Add leaderboard content
+        modes = ["Easy", "Medium", "Hard", "Extreme", "Nathan", "Daily"]
+        for mode in modes:
+            mode_frame = tk.Frame(scrollable_frame, bg="white", relief=tk.RAISED, bd=2)
+            mode_frame.pack(fill=tk.X, padx=20, pady=10)
+            
+            tk.Label(mode_frame, text=f"{mode} Mode", font=("Arial", 16, "bold"), bg="white").pack(pady=5)
+            
+            scores = self.leaderboard[mode]
+            if scores:
+                for i, score in enumerate(scores[:10], 1):
+                    time_str = f"{score['time']}s"
+                    score_text = f"{i}. {score['name']} - {time_str}"
+                    tk.Label(mode_frame, text=score_text, font=("Arial", 11), bg="white").pack()
+            else:
+                tk.Label(mode_frame, text="No scores yet", font=("Arial", 11), fg="gray", bg="white").pack(pady=5)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        tk.Button(self.root, text="Back", font=("Arial", 14), command=self.start_menu, bg="lightgray").pack(pady=10)
+
+    def start_game(self, rows, cols, mines, mode, difficulty_name):
+        self.clear_window()
+        self.game = Minesweeper(self.root, rows, cols, mines, back_to_menu=self.difficulty_menu, mode=mode, 
+                               difficulty_name=difficulty_name, app=self)
+        self.root.bind("<r>", lambda e: self.game.reset_board())
+        self.root.bind("<R>", lambda e: self.game.reset_board())
+
+    def clear_window(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+class Minesweeper:
+    def __init__(self, master, rows, cols, mines, back_to_menu, mode="standard", difficulty_name="", app=None, shape=None, grid_shape=None):
+        self.master = master
+        self.rows = rows
+        self.cols = cols
+        self.mines_count = mines
+        self.mode = mode
+        self.difficulty_name = difficulty_name
+        self.app = app
+        self.back_to_menu = back_to_menu
+        self.shape = shape
+        self.grid_shape = grid_shape or {(r, c) for r in range(rows) for c in range(cols)}
+
+        self.buttons = {}
+        self.mines = set()
+        self.flags = set()
+        self.revealed = set()
+        self.game_over = False
+        self.first_click = True
+        self.wrong_flags = 0
+        self.reveal_count = 0
+        self.max_number_found = 0
+        self.flag_count = 0
+
+        self.top_bar = tk.Frame(master)
+        self.top_bar.pack()
+
+        self.timer_label = tk.Label(self.top_bar, text="Time: 0", font=("Arial", 12))
+        self.timer_label.pack(side=tk.LEFT, padx=10)
+
+        self.mines_label = tk.Label(self.top_bar, text=f"Mines: {self.mines_count}", font=("Arial", 12))
+        self.mines_label.pack(side=tk.LEFT)
+
+        if self.shape:
+            self.shape_label = tk.Label(self.top_bar, text=f"Shape: {self.shape.title()}", font=("Arial", 12))
+            self.shape_label.pack(side=tk.LEFT, padx=10)
+
+        self.back_button = tk.Button(self.top_bar, text="Back", command=self.back_to_menu)
+        self.back_button.pack(side=tk.RIGHT, padx=10)
+
+        self.frame = tk.Frame(master)
+        self.frame.pack()
+
+        self.elapsed_time = 0
+        self.timer_running = False
+        self.timer_id = None
+
+        self.create_widgets()
+        self.update_mine_counter()
+        self.start_timer()
+
+    def create_widgets(self):
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if (r, c) in self.grid_shape:
+                    btn = tk.Button(self.frame, width=2, height=1,
+                                    command=lambda r=r, c=c: self.on_click(r, c))
+                    btn.bind('<Button-3>', lambda e, r=r, c=c: self.toggle_flag(r, c))
+                    btn.grid(row=r, column=c)
+                    self.buttons[(r, c)] = btn
+                else:
+                    # Empty space for shaped grids
+                    spacer = tk.Label(self.frame, width=2, height=1, text="")
+                    spacer.grid(row=r, column=c)
+
+    def on_click(self, r, c):
+        if self.game_over or (r, c) in self.flags or (r, c) in self.revealed:
+            return
+
+        if self.first_click:
+            self.first_click = False
+            if self.mode == "nathan":
+                safe_zone = self.get_chunk(r, c, size=15)
+                self.place_mines_random_except_safe(safe_zone)
+            else:
+                size = 2 if self.rows <= 8 else 3 if self.rows <= 16 else 4
+                safe = self.get_chunk(r, c, size=size)
+                self.place_mines(safe)
+            self.reveal_cell(r, c)
+        else:
+            self.reveal_cell(r, c)
+
+    def get_chunk(self, r, c, size=3):
+        chunk = set()
+        offset = size // 2
+        for dr in range(-offset, offset+1):
+            for dc in range(-offset, offset+1):
+                nr, nc = r+dr, c+dc
+                if 0 <= nr < self.rows and 0 <= nc < self.cols and (nr, nc) in self.grid_shape:
+                    chunk.add((nr, nc))
+        return chunk
+
+    def place_mines(self, safe_zone):
+        available = [cell for cell in self.grid_shape if cell not in safe_zone]
+        self.mines = set(random.sample(available, min(self.mines_count, len(available))))
+        self.calculate_neighbors()
+
+    def place_mines_random_except_safe(self, safe_zone):
+        available = [cell for cell in self.grid_shape if cell not in safe_zone]
+        self.mines = set(random.sample(available, min(self.mines_count, len(available))))
+        self.calculate_neighbors()
+
+    def calculate_neighbors(self):
+        self.neighbor_counts = {}
+        for r, c in self.grid_shape:
+            if (r, c) in self.mines:
+                continue
+            count = 0
+            for rr in range(r-1, r+2):
+                for cc in range(c-1, c+2):
+                    if (rr, cc) in self.mines:
+                        count += 1
+            self.neighbor_counts[(r, c)] = count
+
+    def reveal_cell(self, r, c):
+        if self.game_over or (r, c) in self.revealed or (r, c) in self.flags or (r, c) not in self.grid_shape:
+            return
+
+        btn = self.buttons[(r, c)]
+        self.reveal_count += 1
+
+        if (r, c) in self.mines:
+            btn.config(text="💣", bg="red", disabledforeground="black")
+            self.game_over = True
+            self.timer_running = False
+            self.show_mines()
+            messagebox.showinfo("Game Over", "You hit a mine!")
+            self.show_play_again()
+            return
+
+        self.revealed.add((r, c))
+        count = self.neighbor_counts.get((r, c), 0)
+        btn.config(relief=tk.SUNKEN, state=tk.DISABLED, disabledforeground=self.get_color(count))
+        
+        # Track highest number for achievements
+        if count > self.max_number_found:
+            self.max_number_found = count
+        
+        if count > 0:
+            btn.config(text=str(count))
+        else:
+            btn.config(text="", bg="#ddd")
+
+        if count == 0:
+            for rr in range(r-1, r+2):
+                for cc in range(c-1, c+2):
+                    if (rr, cc) in self.grid_shape and (rr, cc) not in self.revealed and (rr, cc) not in self.mines:
+                        self.reveal_cell(rr, cc)
+
+        if self.check_win():
+            self.timer_running = False
+            self.handle_win()
+
+    def handle_win(self):
+        """Handle winning the game and check for high score"""
+        # Prepare game result for achievements
+        game_result = {
+            "won": True,
+            "mode": self.difficulty_name,
+            "time": self.elapsed_time,
+            "perfect_flags": self.wrong_flags == 0,
+            "no_flag_only": self.flag_count == 0,
+            "max_number": self.max_number_found
+        }
+        
+        # Check achievements
+        if self.app:
+            self.app.check_achievements(game_result)
+        
+        # Check if it's a high score
+        if self.app and self.app.is_high_score(self.difficulty_name, self.elapsed_time):
+            messagebox.showinfo("You Win!", f"Congratulations! New high score: {self.elapsed_time}s")
+            name = simpledialog.askstring("High Score!", "Enter your name:")
+            if name:
+                name = name.strip()[:20]  # Limit name length
+                if not name:
+                    name = "Anonymous"
+                self.app.add_score(self.difficulty_name, self.elapsed_time, name)
+            else:
+                self.app.add_score(self.difficulty_name, self.elapsed_time, "Anonymous")
+        else:
+            messagebox.showinfo("You Win!", f"Congratulations! Time: {self.elapsed_time}s")
+        
+        self.show_play_again()
+
+    def show_mines(self):
+        for (r, c) in self.mines:
+            if (r, c) in self.buttons:
+                btn = self.buttons[(r, c)]
+                if (r, c) not in self.flags:
+                    btn.config(text="💣", bg="red", disabledforeground="black")
+
+    def show_play_again(self):
+        self.play_again_btn = tk.Button(self.master, text="Play Again", command=self.reset_board, font=("Arial", 14))
+        self.play_again_btn.pack(pady=10)
+
+    def reset_board(self):
+        if hasattr(self, 'play_again_btn'):
+            self.play_again_btn.pack_forget()
+        self.mines = set()
+        self.flags = set()
+        self.revealed = set()
+        self.game_over = False
+        self.first_click = True
+        self.flag_count = 0
+        self.elapsed_time = 0
+        self.wrong_flags = 0
+        self.reveal_count = 0
+        self.max_number_found = 0
+        self.timer_label.config(text="Time: 0")
+        self.timer_running = False
+        if self.timer_id:
+            self.master.after_cancel(self.timer_id)
+            self.timer_id = None
+        for btn in self.buttons.values():
+            btn.config(text="", bg="SystemButtonFace", relief=tk.RAISED, state=tk.NORMAL)
+        self.update_mine_counter()
+        self.start_timer()
+
+    def toggle_flag(self, r, c):
+        if self.game_over or (r, c) in self.revealed or (r, c) not in self.grid_shape:
+            return
+        btn = self.buttons[(r, c)]
+        if (r, c) in self.flags:
+            self.flags.remove((r, c))
+            btn.config(text="")
+            # Check if this was a wrong flag
+            if (r, c) not in self.mines:
+                self.wrong_flags -= 1
+        else:
+            self.flags.add((r, c))
+            btn.config(text="🔺", fg="red")
+            self.flag_count += 1
+            # Check if this is a wrong flag
+            if (r, c) not in self.mines:
+                self.wrong_flags += 1
+        self.update_mine_counter()
+        if self.check_win():
+            self.timer_running = False
+            self.handle_win()
+
+    def update_mine_counter(self):
+        count = self.mines_count - len(self.flags)
+        self.mines_label.config(text=f"Mines: {count}")
+
+    def check_win(self):
+        valid_cells = len(self.grid_shape)
+        return len(self.revealed) == valid_cells - len(self.mines)
+
+    def get_color(self, count):
+        colors = {
+            1: "blue",
+            2: "green",
+            3: "red",
+            4: "purple",
+            5: "darkred",
+            6: "cyan",
+            7: "black",
+            8: "gray",
+        }
+        return colors.get(count, "black")
+
+    def start_timer(self):
+        self.timer_running = True
+        self.timer_tick()
+
+    def timer_tick(self):
+        if not self.timer_running:
+            return
+        if not self.timer_label.winfo_exists():
+            self.timer_running = False
+            return
+        self.elapsed_time += 1
+        self.timer_label.config(text=f"Time: {self.elapsed_time}")
+        self.timer_id = self.master.after(1000, self.timer_tick)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = MinesweeperApp(root)
+    root.mainloop()
